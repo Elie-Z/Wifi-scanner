@@ -1,94 +1,93 @@
 import customtkinter as ctk
 from ip_retrieve import ip
 import scapy.all as scapy
+import ipaddress
 
+def is_valid_ip_range(ip_range):
+    try:
+        # Validate the input as an IPv4 network
+        ipaddress.ip_network(ip_range, strict=False)
+        return True
+    except ValueError:
+        return False
 
 app = ctk.CTk()
 app.title('Wifi Scanner')
-app.geometry("800x800")
+app.geometry("800x550")
 
-# Label for IP entry
-label_ip = ctk.CTkLabel(app, text="Enter IP address and range", fg_color="transparent")
-label_ip.grid(row=0, column=0, padx=20, pady=20, sticky="ew")
-
-# Entry field for IP input
-entry = ctk.CTkEntry(app, placeholder_text="e.g. 192.168.8.1/24")
-entry.grid(row=0, column=1, padx=20, pady=20, sticky="ew")
-
-# Button to collect IP
-m_ip = ctk.CTkButton(app, text="Collect IP")
-m_ip.grid(row=0, column=3, padx=20, pady=20, sticky="ew")
-
-# Label for displaying captured IP
-label_display = ctk.CTkLabel(app, text="Captured IP will appear here:", fg_color="transparent")
-label_display.grid(row=1, column=0, padx=20, pady=20, sticky="ew")
-
-# Entry (or Label) for displaying captured IP
-entry_a = ctk.CTkLabel(app, text="Waiting for IP...", fg_color="transparent")
-entry_a.grid(row=1, column=1, padx=30, pady=30, sticky="ew")
-
-# Function to update the label with captured IP
-def update_ip_label():
-    captured_ip = ip()
-    if captured_ip:
-        entry_a.configure(text=f"Captured IP: {captured_ip}")
-    else:
-        entry_a.configure(text="Failed to retrieve IP.")
-
-# Button to collect ip automatically
-auto_ip = ctk.CTkButton(app, text="Gather my IP", command=update_ip_label)
-auto_ip.grid(row=1, column=3, padx=20, pady=20, sticky="ew")
-
-# Results frame
-
-
-def scan():
-    info = {}
-    answered, unanswered = scapy.arping('192.168.8.1/24', verbose=0)
-    for sent, received in answered:
-        info[received.hwsrc.replace(':', "-").upper()] = received.psrc
-    return info
 
 def update_results():
-    results = scan()
-    if results:
-        keys_text = "\n".join(results.keys())  # Convert keys to a string
-        values_text = "\n".join(results.values())  # Convert values to a string
-        label_results2.configure(text=f"MAC Addresses:\n{keys_text}")
-        label_results.configure(text=f"IP Addresses:\n{values_text}")
+    entered_ip = manual_ip.get()
+
+    # Check if the entered IP is valid
+    if is_valid_ip_range(entered_ip):
+        warning_label.configure(text=f'Scanning: {entered_ip}', font=("Arial", 18), text_color="green")
+        info = {}
+        answered, unanswered = scapy.arping(entered_ip, verbose=0)
+
+        for sent, received in answered:
+            info[received.hwsrc.replace(':', "-").upper()] = received.psrc
+
+        if info:
+            # Display MAC and IP addresses
+            keys_text = "\n".join(info.keys())
+            values_text = "\n".join(info.values())
+            mac_label.configure(text=f"MAC Addresses:\n{keys_text}")
+            ip_label.configure(text=f"IP Addresses:\n{values_text}")
+        else:
+            # No devices found
+            mac_label.configure(text="No devices found.")
+            ip_label.configure(text="No devices found.")
+    elif entered_ip.strip() == "":
+        # Prompt for empty input
+        warning_label.configure(text="Please enter an IP range.", font=("Arial", 18), text_color="red")
     else:
-        label_results2.configure(text="No devices found.")
-        label_results.configure(text="No devices found.")
+        # Invalid IP range
+        warning_label.configure(text=f"{entered_ip} is NOT a valid IP range.", font=("Arial", 18), text_color="red")
 
 
-# Frame for IP Addresses
-frame_ip = ctk.CTkFrame(app, width=300, height=200)
-frame_ip.grid(row=2, column=0, padx=20, pady=20, sticky="nsew")  # Separate row and column
+def auto_ip():
+    captured_ip = ip()
+    if captured_ip:
+        manual_ip.delete(0, ctk.END)
+        manual_ip.insert(0, captured_ip)
 
-# Label for IP Addresses
-label_results = ctk.CTkLabel(
-    frame_ip, text="IP Addresses will appear here...", fg_color="transparent", wraplength=280
-)
-label_results.pack(padx=20, pady=20)  # Use pack for better positioning within the frame
+# First layout
+label_ip = ctk.CTkLabel(app, text="Enter IP address and range", fg_color="transparent")
+label_ip.place(x=120, y=50)
 
-# Frame for MAC Addresses
-frame_mac = ctk.CTkFrame(app, width=300, height=200)
-frame_mac.grid(row=2, column=1, padx=20, pady=20, sticky="nsew")  # Adjacent column
+manual_ip = ctk.CTkEntry(app, placeholder_text="e.g. 192.168.8.1/24", width=150)
+manual_ip.place(x=300, y=50)
 
-# Label for MAC Addresses
-label_results2 = ctk.CTkLabel(
-    frame_mac, text="MAC Addresses will appear here...", fg_color="transparent", wraplength=280
-)
-label_results2.pack(padx=20, pady=20)
+auto_ip_btn = ctk.CTkButton(app, text="Automatically Get My IP", command=auto_ip, width=100)
+auto_ip_btn.place(x=500, y=50)
 
-# Adjust grid configuration to distribute space evenly
-app.grid_columnconfigure(0, weight=1)
-app.grid_columnconfigure(1, weight=1)
-app.grid_rowconfigure(2, weight=1)
+warning_label = ctk.CTkLabel(app, text='', text_color="red")
+warning_label.place(x=260, y=100)
 
+# Second Layout - IP Addresses Frame
+frame_ip = ctk.CTkFrame(app, width=200, height=300)
+frame_ip.place(x=150, y=150)
 
+scrollable_frame_ip = ctk.CTkScrollableFrame(frame_ip, width=160, height=270)
+scrollable_frame_ip.place(x=10, y=10)
+
+ip_label = ctk.CTkLabel(scrollable_frame_ip, text='IP Address')
+ip_label.pack(pady=3)
+
+# Second Layout - MAC Addresses Frame
+frame_mac = ctk.CTkFrame(app, width=200, height=300)
+frame_mac.place(x=380, y=150)
+
+scrollable_frame_mac = ctk.CTkScrollableFrame(frame_mac, width=160, height=270)
+scrollable_frame_mac.place(x=10, y=10)
+
+mac_label = ctk.CTkLabel(scrollable_frame_mac, text='MAC Addresses')
+mac_label.pack(pady=3)
+
+# Scan Button
 scan_btn = ctk.CTkButton(app, text="Scan", text_color="white", fg_color="blue", hover_color="red", command=update_results)
-scan_btn.grid(row=3, column=1)
+scan_btn.place(x=300, y=500)
 
 if __name__ == "__main__":
     app.mainloop()
