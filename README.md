@@ -46,7 +46,7 @@ pip install customtkinter scapy ip-retrieve
 Once the dependencies are installed, you can start the application by running:
 
 ```bash
-python wifi_scanner.py
+python app.py
 ```
 This will launch the Wi-Fi Scanner GUI application.
 
